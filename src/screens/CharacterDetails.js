@@ -8,30 +8,36 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import { useNavigation, useRoute } from '@react-navigation/core'
 import { useDispatch, useSelector } from 'react-redux'
-import axios from 'axios'
 
 import CharacterDetail from '../components/Characters/CharacterDetail'
 import LikeButton from '../components/LikeButton/LikeButton'
 import { wasLiked, wasUnliked } from '../store/fansSlice'
-import { characterLiked, characterUnliked } from '../store/charactersSlice'
+import {
+  characterLiked,
+  characterUnliked,
+  getFilms,
+  getStarships,
+} from '../store/charactersSlice'
+import { useGetHomeworldQuery } from '../services/starWarsApi'
 
 const CharacterDetails = () => {
   const dispatch = useDispatch()
   const route = useRoute()
   const { goBack } = useNavigation()
-  const [planet, setPlanet] = useState('')
-  const [starships, setStarships] = useState('')
-  const [films, setFilms] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const { item } = route.params
   const character = useSelector(state =>
     state.charactersSlice.characters.find(
       character => character?.name === item?.name
     )
   )
+  const starships = useSelector(state => state.charactersSlice.starships)
+  const films = useSelector(state => state.charactersSlice.films)
+  const loading = useSelector(state => state.charactersSlice.loading)
+  const planet = useGetHomeworldQuery(Number(item.homeworld.match(/\d+/))).data
+    ?.name
 
   const like = () => {
     if (character.liked === 0) {
@@ -43,63 +49,9 @@ const CharacterDetails = () => {
     }
   }
 
-  const getHomeworld = () => {
-    try {
-      axios.get(`${item.homeworld}`).then(response => {
-        setPlanet(response.data.name)
-      })
-    } catch (error) {
-      throw error
-    }
-  }
-
-  const getStarships = () => {
-    const starshipsArray = []
-
-    try {
-      axios.all(item.starships.map(link => axios.get(link))).then(
-        axios.spread(function (...responses) {
-          responses.map(response => {
-            starshipsArray.push(response.data.name)
-          })
-          if (!starshipsArray.length) {
-            setStarships('none')
-
-            return
-          }
-          setStarships(starshipsArray.join(', '))
-        })
-      )
-    } catch (error) {
-      throw error
-    }
-  }
-
-  const getFilms = () => {
-    const filmsArray = []
-
-    try {
-      axios.all(item.films.map(link => axios.get(link))).then(
-        axios.spread(function (...responses) {
-          responses.map(response => {
-            filmsArray.push(response.data.title)
-          })
-
-          setFilms(filmsArray.join(', '))
-          setIsLoading(false)
-        })
-      )
-    } catch (error) {
-      throw error
-    }
-  }
-
   useEffect(() => {
-    setIsLoading(true)
-
-    getHomeworld()
-    getStarships()
-    getFilms()
+    dispatch(getStarships(item))
+    dispatch(getFilms(item))
   }, [])
 
   return (
@@ -116,7 +68,7 @@ const CharacterDetails = () => {
         <LikeButton like={like} liked={character.liked} />
       </View>
       <ScrollView style={styles.content}>
-        {isLoading ? (
+        {loading ? (
           <ActivityIndicator size='small' color='#000000' />
         ) : (
           <View style={styles.detailsContainer}>

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import { SafeAreaView, StyleSheet, ActivityIndicator } from 'react-native'
-import axios from 'axios'
 import { useDispatch, useSelector } from 'react-redux'
 
 import {
@@ -11,37 +10,40 @@ import {
 } from '../store/charactersSlice'
 import CharactersList from '../components/Characters/CharactersList'
 import FansTab from '../components/FansTab/FansTab'
+import { useGetCharactersQuery } from '../services/starWarsApi'
 
 const Home = () => {
   const dispatch = useDispatch()
   const characters = useSelector(state => state.charactersSlice.characters)
-  const loading = useSelector(state => state.charactersSlice.loading)
   const moreLoading = useSelector(state => state.charactersSlice.moreLoading)
   const isListEnd = useSelector(state => state.charactersSlice.isListEnd)
   const [page, setPage] = useState(1)
+  const { data, error, isLoading } = useGetCharactersQuery(page)
 
   const getCharacters = () => {
     dispatch(charactersRequest(page))
 
-    if (page === 10) {
+    if (page > 10) {
       dispatch(charactersListEnd())
 
       return
     }
 
-    try {
-      axios.get(`https://swapi.dev/api/people/?page=${page}`).then(response => {
-        const characters = response.data.results.map(character => {
-          return {
-            ...character,
-            liked: 0,
-          }
-        })
-
-        dispatch(charactersRequestSuccess(characters))
-      })
-    } catch (error) {
+    if (error) {
       dispatch(charactersRequestFailure(error))
+
+      return
+    }
+
+    if (!isLoading) {
+      const characters = data.results.map(character => {
+        return {
+          ...character,
+          liked: 0,
+        }
+      })
+
+      dispatch(charactersRequestSuccess(characters))
     }
   }
 
@@ -58,7 +60,7 @@ const Home = () => {
   return (
     <SafeAreaView style={styles.container}>
       <FansTab />
-      {loading ? (
+      {isLoading ? (
         <ActivityIndicator size='small' color='#000000' />
       ) : (
         <CharactersList
